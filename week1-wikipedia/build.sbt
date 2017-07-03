@@ -8,6 +8,8 @@ courseId := "e8VseYIYEeWxQQoymFg8zQ"
 
 resolvers += Resolver.sonatypeRepo("releases")
 
+libraryDependencies += "org.apache.spark" %% "spark-core" % "2.1.1"
+
 // grading libraries
 libraryDependencies += "junit" % "junit" % "4.10" % "test"
 libraryDependencies ++= assignmentsMap.value.values.flatMap(_.dependencies).toSeq
@@ -17,7 +19,7 @@ commonSourcePackages += "common"
 
 assignmentsMap := {
   val depsSpark = Seq(
-    "org.apache.spark" %% "spark-core" % "2.1.0"
+    "org.apache.spark" %% "spark-core" % "2.1.1"
   )
   Map(
     "example" -> Assignment(

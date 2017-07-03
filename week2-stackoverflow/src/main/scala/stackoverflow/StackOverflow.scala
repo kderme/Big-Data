@@ -21,10 +21,18 @@ object StackOverflow extends StackOverflow {
   def main(args: Array[String]): Unit = {
 
     val lines   = sc.textFile("src/main/resources/stackoverflow/stackoverflow.csv")
+//    lines.take(1).foreach(println)
     val raw     = rawPostings(lines)
+//    raw.take(1).foreach(println)
     val grouped = groupedPostings(raw)
+//    grouped.take(1).foreach(println)
     val scored  = scoredPostings(grouped)
+//    scored.take(1).foreach(println)
     val vectors = vectorPostings(scored)
+//    vectors.take(1).foreach(println)
+    println(vectors.count)
+//    vectors.take(10).foreach(println)
+    
 //    assert(vectors.count() == 2121822, "Incorrect number of vectors: " + vectors.count())
 
     val means   = kmeans(sampleVectors(vectors), vectors, debug = true)
@@ -78,7 +86,18 @@ class StackOverflow extends Serializable {
 
   /** Group the questions and answers together */
   def groupedPostings(postings: RDD[Posting]): RDD[(Int, Iterable[(Posting, Posting)])] = {
-    ???
+    //cache to avoid recomputation
+    //TODO should cache be done outside of this function?
+    postings.cache()
+    val questions=postings.filter(_.postingType==1)
+                          .map(x=>(x.id,x))
+    val answers=postings.filter(_.postingType==2)
+                        .map(x=>(x.parentId.get,x)) //just get. If it`s None crush!
+    //Inner join excludes questions without an answer.
+    //leftOuterJoin needs a change at return Type RDD[(Int, Iterable[(Posting, Option[Posting])])]
+    val pairs=questions.join(answers)
+    pairs.groupByKey()
+
   }
 
 
@@ -91,13 +110,15 @@ class StackOverflow extends Serializable {
           while (i < as.length) {
             val score = as(i).score
                 if (score > highScore)
-                  highScore = score
+                  highScore = score                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
                   i += 1
           }
       highScore
     }
 
-    ???
+    grouped.map{
+      case (_,ls)=>(ls.find(_=>true).get._1,answerHighScore(ls.unzip._2.toArray))
+    }
   }
 
 
@@ -117,7 +138,13 @@ class StackOverflow extends Serializable {
       }
     }
 
-    ???
+    scored
+    .map{case (post,x)=>{
+       val n=firstLangInTag(post.tags,langs)
+       (n,x)}
+    }
+    .filter{case(opt,_)=>(!opt.isEmpty)}
+    .map   {case (opt,x)=>(langSpread*opt.get,x)}
   }
 
 

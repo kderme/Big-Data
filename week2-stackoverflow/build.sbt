@@ -17,7 +17,7 @@ commonSourcePackages += "common"
 
 assignmentsMap := {
   val depsSpark = Seq(
-    "org.apache.spark" %% "spark-core" % "2.1.0"
+    "org.apache.spark" %% "spark-core" % "2.1.1"
   )
   Map(
     "example" -> Assignment(

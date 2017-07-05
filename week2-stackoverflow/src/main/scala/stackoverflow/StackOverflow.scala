@@ -21,23 +21,23 @@ object StackOverflow extends StackOverflow {
   def main(args: Array[String]): Unit = {
 
     val lines   = sc.textFile("src/main/resources/stackoverflow/stackoverflow.csv")
-    lines.take(1).foreach(println)
-    val raw     = rawPostings(lines).cache()
-    raw.take(1).foreach(println)
-    val grouped = groupedPostings(raw).cache()
-    grouped.take(1).foreach(println)
-    val scored  = scoredPostings(grouped).sample(true,0.003,0).cache()
-    scored.take(1).foreach(println)
-    val vectors = vectorPostings(scored).cache()
-    vectors.take(1).foreach(println)
+//    lines.take(1).foreach(println)
+    val raw     = rawPostings(lines)
+//    raw.take(1).foreach(println)
+    val grouped = groupedPostings(raw)
+ //   grouped.take(1).foreach(println)
+    val scored  = scoredPostings(grouped)/*.sample(true,0.003,0)*/
+//    scored.take(1).foreach(println)
+    val vectors = vectorPostings(scored)
+//    vectors.take(1).foreach(println)
     println(vectors.count)
     
 //    assert(vectors.count() == 2121822, "Incorrect number of vectors: " + vectors.count())
 
-    val means   = kmeans(sampleVectors(vectors).distinct, vectors, debug = true)
-    means.take(1).foreach(println)
+    val means   = kmeans(sampleVectors(vectors), vectors, debug = true)
+//    means.take(1).foreach(println)
     val results = clusterResults(means, vectors)
-    results.take(1).foreach(println)
+//    results.take(1).foreach(println)
     printResults(results)
   }
 }
@@ -89,7 +89,6 @@ class StackOverflow extends Serializable {
   def groupedPostings(postings: RDD[Posting]): RDD[(Int, Iterable[(Posting, Posting)])] = {
     //cache to avoid recomputation
     //TODO should cache be done outside of this function?
-    postings.cache()
     val questions=postings.filter(_.postingType==1)
                           .map(x=>(x.id,x))
     val answers=postings.filter(_.postingType==2)
@@ -139,13 +138,18 @@ class StackOverflow extends Serializable {
       }
     }
 
-    scored
+    val vectors=scored
     .map{case (post,x)=>{
        val n=firstLangInTag(post.tags,langs)
        (n,x)}
     }
     .filter{case(opt,_)=>(!opt.isEmpty)}
     .map   {case (opt,x)=>(langSpread*opt.get,x)}
+    
+    //In Discussion Forum "My summary to get 10/10 got this assignment"
+    //it was mentioned that vectors should not be cached in main but in functions
+    //as grader doesn`t run main
+    vectors.cache()
   }
 
 
@@ -200,15 +204,23 @@ class StackOverflow extends Serializable {
 
   /** Main kmeans computation */
   @tailrec final def kmeans(means: Array[(Int, Int)], vectors: RDD[(Int, Int)], iter: Int = 1, debug: Boolean = false): Array[(Int, Int)] = {
-//    val newMeans = means.clone() // you need to compute newMeans
     def addTriple(x:(Int,Int,Int),y:(Int,Int,Int)):(Int,Int,Int)=
-      (x._1+y._1,x._2+y._2,x._3+y._3)
+    (x._1+y._1,x._2+y._2,x._3+y._3)
     
-    val newMeans = vectors.map(vector=>(findClosest(vector,means),(vector._1,vector._2,1)))
+    val newMeans = means.clone() // you need to compute newMeans      
+    
+    //This update trick(last line) was found at discussion forum week 2 with title
+    //"kmeans initializes with non-distinct means"
+    //problem was that initial means were not all distinct,
+    //so some of them were lost and we had an asser error
+    vectors.map(vector=>(findClosest(vector,means),(vector._1,vector._2,1)))
                     .reduceByKey(addTriple)
                     .mapValues(tr=>(tr._1/tr._3,tr._2/tr._3))
-                    .map{case (x,tr)=>tr}
-                    .collect:Array[(Int, Int)]
+//                    .map{case (x,tr)=>tr}
+                    .collect
+                    .foreach({ case (i,vl)=>newMeans.update(i,vl)})
+
+     //val newMeans =                    //:Array[(Int, Int)]
                     
     // TODO: Fill in the newMeans array
     val distance = euclideanDistance(means, newMeans)

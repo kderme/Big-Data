@@ -212,7 +212,7 @@ class StackOverflow extends Serializable {
     //This update trick(last line) was found at discussion forum week 2 with title
     //"kmeans initializes with non-distinct means"
     //problem was that initial means were not all distinct,
-    //so some of them were lost and we had an asser error
+    //so some of them were lost and we had an assert error
     vectors.map(vector=>(findClosest(vector,means),(vector._1,vector._2,1)))
                     .reduceByKey(addTriple)
                     .mapValues(tr=>(tr._1/tr._3,tr._2/tr._3))
@@ -340,12 +340,14 @@ class StackOverflow extends Serializable {
       
       val langLabel: String =   langs(idMax/langSpread)
       val maxNum = vs.filter(_._1==idMax).count(_=>true) //foldLeft(0)((acc,x)=>x._2+acc)
-      val clusterSize: Int    = vs.count(_=>true)
+      val clusterSize: Int    = vs.size
 //    val allNum = vs.foldLeft(0)((acc,x)=>x._2+acc)
       val langPercent: Double =100.0*maxNum/clusterSize
          // percent of the questions in the most common language
       val forMed=vs.toArray.sortBy(_._2)
-      val medianScore: Int =forMed(clusterSize/2)._2
+      val medianScore: Int =
+        if (clusterSize%2==0) (forMed(clusterSize/2-1)._2+forMed(clusterSize/2)._2)/2
+        else forMed(clusterSize/2)._2
 
       (langLabel, langPercent, clusterSize, medianScore)
     }

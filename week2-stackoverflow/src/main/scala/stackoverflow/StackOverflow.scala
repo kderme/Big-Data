@@ -213,16 +213,17 @@ class StackOverflow extends Serializable {
     //"kmeans initializes with non-distinct means"
     //problem was that initial means were not all distinct,
     //so some of them were lost and we had an assert error
-    vectors.map(vector=>(findClosest(vector,means),(vector._1,vector._2,1)))
-                    .reduceByKey(addTriple)
-                    .mapValues(tr=>(tr._1/tr._3,tr._2/tr._3))
-//                    .map{case (x,tr)=>tr}
-                    .collect
-                    .foreach({ case (i,vl)=>newMeans.update(i,vl)})
-
-     //val newMeans =                    //:Array[(Int, Int)]
+    vectors
+//    .map(vector=>(findClosest(vector,means),(vector._1,vector._2,1)))
+      .map(vector=>(findClosest(vector,means),vector))
+      //our custom average with reduceByKey din`t work
+//    .reduceByKey(addTriple)
+//    .mapValues(tr=>(tr._1/tr._3,tr._2/tr._3))
+      .groupByKey()
+      .mapValues(averageVectors)
+      .collect
+      .foreach({ case (i,vl)=>newMeans.update(i,vl)})
                     
-    // TODO: Fill in the newMeans array
     val distance = euclideanDistance(means, newMeans)
 
     if (debug) {

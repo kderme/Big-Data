@@ -11,6 +11,7 @@ object TimeUsage {
   import org.apache.spark.sql.SparkSession
   import org.apache.spark.sql.functions._
 
+  val HOME=false
   val spark: SparkSession =
     SparkSession
       .builder()
@@ -29,6 +30,7 @@ object TimeUsage {
   def timeUsageByLifePeriod(): Unit = {
     val (columns, initDf) = read("/timeusage/atussum.csv")
     val (primaryNeedsColumns, workColumns, otherColumns) = classifiedColumns(columns)
+    
     val summaryDf = timeUsageSummary(primaryNeedsColumns, workColumns, otherColumns, initDf)
     val finalDf = timeUsageGrouped(summaryDf)
     finalDf.show()
@@ -36,7 +38,10 @@ object TimeUsage {
 
   /** @return The read DataFrame along with its column names. */
   def read(resource: String): (List[String], DataFrame) = {
-    val rdd = spark.sparkContext.textFile(fsPath(resource))
+    val rdd = 
+      if (HOME) 
+        spark.sparkContext.textFile("./src/main/resources/timeusage/atussum.csv")
+      else spark.sparkContext.textFile(fsPath(resource))
 
     val headerColumns = rdd.first().split(",").to[List]
     // Compute the schema based on the first line of the CSV file
@@ -62,15 +67,22 @@ object TimeUsage {
     *         have type Double. None of the fields are nullable.
     * @param columnNames Column names of the DataFrame
     */
-  def dfSchema(columnNames: List[String]): StructType =
-    ???
+  def dfSchema(columnNames: List[String]): StructType ={
+    val hd=StructField(columnNames.head,StringType,false)
+    val tl=columnNames.tail.map(StructField(_,IntegerType,false))
+    StructType(hd::tl)
+  }
 
 
   /** @return An RDD Row compatible with the schema produced by `dfSchema`
     * @param line Raw fields
     */
-  def row(line: List[String]): Row =
-    ???
+  def row(line: List[String]): Row ={
+    val hd=line.head
+    val tl=line.tail.map(_.toDouble)
+    Row(hd::tl)
+  }
+    
 
   /** @return The initial data frame columns partitioned in three groups: primary needs (sleeping, eating, etc.),
     *         work and other (leisure activities)
@@ -88,7 +100,28 @@ object TimeUsage {
     *    “t10”, “t12”, “t13”, “t14”, “t15”, “t16” and “t18” (those which are not part of the previous groups only).
     */
   def classifiedColumns(columnNames: List[String]): (List[Column], List[Column], List[Column]) = {
-    ???
+    val types1=List("t01","t03","t11","t1801","t1803")
+    val types2=List("t05","t1805")
+    val types3=List("t02","t04","t06","t07","t08","t09","t10","t12","t13","t14","t15","t16","t18")
+    
+    def recAdd(names: List[String],acc:(List[String],List[String],List[String])):
+       (List[String], List[String], List[String])=names match{
+       case Nil=>acc
+       case (name::restNames)=>         
+         if(types1.exists(x=>name.startsWith(x)))
+           recAdd(restNames,(name::acc._1,acc._2,acc._3))
+         else if(types2.exists(x=>name.startsWith(x)))
+           recAdd(restNames,(acc._1,name::acc._2,acc._3))
+         else if(types3.exists(x=>name.startsWith(x)))
+           recAdd(restNames,(acc._1,acc._2,name::acc._3))
+         else acc
+    }
+    
+    val lsStr=recAdd(columnNames,(List(),List(),List()))
+     
+    def do3(ls:List[String]):List[Column]=ls.map(new Column(_)).reverse
+    
+    (do3(lsStr._1),do3(lsStr._2),do3(lsStr._3))
   }
 
   /** @return a projection of the initial DataFrame such that all columns containing hours spent on primary needs

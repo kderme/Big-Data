@@ -11,7 +11,7 @@ object TimeUsage {
   import org.apache.spark.sql.SparkSession
   import org.apache.spark.sql.functions._
 
-  val HOME=false
+  val HOME=true
   val spark: SparkSession =
     SparkSession
       .builder()
@@ -69,7 +69,7 @@ object TimeUsage {
     */
   def dfSchema(columnNames: List[String]): StructType ={
     val hd=StructField(columnNames.head,StringType,false)
-    val tl=columnNames.tail.map(StructField(_,IntegerType,false))
+    val tl=columnNames.tail.map(StructField(_,DoubleType,false))
     StructType(hd::tl)
   }
 
@@ -108,11 +108,11 @@ object TimeUsage {
        (List[String], List[String], List[String])=names match{
        case Nil=>acc
        case (name::restNames)=>         
-         if(types1.exists(x=>name.startsWith(x)))
+         if(types1.exists(name.startsWith(_)))
            recAdd(restNames,(name::acc._1,acc._2,acc._3))
-         else if(types2.exists(x=>name.startsWith(x)))
+         else if(types2.exists(name.startsWith(_)))
            recAdd(restNames,(acc._1,name::acc._2,acc._3))
-         else if(types3.exists(x=>name.startsWith(x)))
+         else if(types3.exists(name.startsWith(_)))
            recAdd(restNames,(acc._1,acc._2,name::acc._3))
          else acc
     }
@@ -160,13 +160,20 @@ object TimeUsage {
     otherColumns: List[Column],
     df: DataFrame
   ): DataFrame = {
-    val workingStatusProjection: Column = ???
-    val sexProjection: Column = ???
-    val ageProjection: Column = ???
+    val workingStatusProjection: Column = 
+      when($"telfs">=1 && $"telfs"<3,"working")
+      .otherwise("not working")
+    val sexProjection: Column =
+      when($"tesex"===1,"male")
+      .otherwise("female")
+    val ageProjection: Column =
+      when($"teage">=15 && $"teage"<=22,"young")
+      .when($"teage">=23 && $"teage"<=55,"active")
+      .otherwise("elder")
 
-    val primaryNeedsProjection: Column = ???
-    val workProjection: Column = ???
-    val otherProjection: Column = ???
+    val primaryNeedsProjection: Column = primaryNeedsColumns.reduce(_+_) /60.0
+    val workProjection: Column = workColumns.reduce(_+_) /60.0
+    val otherProjection: Column = otherColumns.reduce(_+_) /60.0
     df
       .select(workingStatusProjection, sexProjection, ageProjection, primaryNeedsProjection, workProjection, otherProjection)
       .where($"telfs" <= 4) // Discard people who are not in labor force
